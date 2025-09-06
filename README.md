@@ -67,3 +67,9 @@ Share the URL `yoursite.com/mobile-social-post/` with users who need to create s
 - Mobile form creation
 - Camera integration
 - Basic validation and security
+
+## Zip it up commands
+
+Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope Process
+
+.\zip-plugin.ps1 -Force

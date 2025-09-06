@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Spark Mobile Social Posts
  * Description: Mobile-friendly frontend form for creating Social Posts with camera integration
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: Bth
  * License: GPL-2.0-or-later
  * Text Domain: spark-mobile-posts
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 define( 'SPARK_MOBILE_PLUGIN_FILE', __FILE__ );
 define( 'SPARK_MOBILE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SPARK_MOBILE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'SPARK_MOBILE_PLUGIN_VER', '1.0.0' );
+define( 'SPARK_MOBILE_PLUGIN_VER', '1.1.0' );
 
 /**
  * Create the mobile submission page
@@ -37,6 +37,35 @@ function spark_mobile_create_submission_page() {
 register_activation_hook( __FILE__, 'spark_mobile_create_submission_page' );
 
 /**
+ * Add custom capability for social posts
+ */
+function spark_mobile_add_capabilities() {
+    // Add capability to administrator role
+    $admin_role = get_role( 'administrator' );
+    if ( $admin_role ) {
+        $admin_role->add_cap( 'create_social_posts' );
+    }
+    
+    // Add capability to editor role
+    $editor_role = get_role( 'editor' );
+    if ( $editor_role ) {
+        $editor_role->add_cap( 'create_social_posts' );
+    }
+}
+register_activation_hook( __FILE__, 'spark_mobile_add_capabilities' );
+
+/**
+ * Check if user has permission to create social posts
+ */
+function spark_mobile_user_can_create_posts() {
+    if ( ! is_user_logged_in() ) {
+        return false;
+    }
+    
+    return current_user_can( 'create_social_posts' ) || current_user_can( 'administrator' );
+}
+
+/**
  * Add shortcode for the mobile form
  */
 function spark_mobile_social_form_shortcode() {
@@ -50,6 +79,12 @@ add_shortcode( 'spark_mobile_social_form', 'spark_mobile_social_form_shortcode' 
  * Render the mobile-optimized form
  */
 function spark_mobile_render_form() {
+    // Check if user is logged in and has permission
+    if ( ! spark_mobile_user_can_create_posts() ) {
+        spark_mobile_render_login_notice();
+        return;
+    }
+    
     // Handle form submission
     $message = '';
     if ( isset( $_POST['submit_social_post'] ) && wp_verify_nonce( $_POST['social_post_nonce'], 'submit_social_post' ) ) {
@@ -61,9 +96,16 @@ function spark_mobile_render_form() {
         'taxonomy' => 'social-post-category',
         'hide_empty' => false,
     ) );
+    
+    $current_user = wp_get_current_user();
     ?>
     
     <div class="spark-mobile-form-container">
+        <div class="user-info">
+            <p>Welcome, <strong><?php echo esc_html( $current_user->display_name ); ?></strong>! 
+            <a href="<?php echo wp_logout_url( get_permalink() ); ?>" class="logout-link">Logout</a></p>
+        </div>
+        
         <?php if ( $message ) : ?>
             <div class="spark-message <?php echo strpos( $message, 'Error' ) !== false ? 'error' : 'success'; ?>">
                 <?php echo $message; ?>
@@ -82,8 +124,16 @@ function spark_mobile_render_form() {
             
             <div class="form-group">
                 <label for="featured_image">Photo</label>
+                <div class="photo-options">
+                    <button type="button" id="take_photo_btn" class="photo-btn">
+                        📸 Take Photo
+                    </button>
+                    <button type="button" id="choose_photo_btn" class="photo-btn">
+                        🖼️ Choose from Gallery
+                    </button>
+                </div>
                 <input type="file" id="featured_image" name="featured_image" 
-                       accept="image/*" capture="environment" required>
+                       accept="image/*" required style="display: none;">
                 <div id="image_preview"></div>
             </div>
             
@@ -120,6 +170,67 @@ function spark_mobile_render_form() {
         margin: 0 auto;
         padding: 20px;
         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    .user-info {
+        background: #f8f9fa;
+        padding: 12px 16px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .user-info p {
+        margin: 0;
+        font-size: 14px;
+        color: #666;
+    }
+    
+    .logout-link {
+        color: #007cba;
+        text-decoration: none;
+        font-size: 14px;
+    }
+    
+    .logout-link:hover {
+        text-decoration: underline;
+    }
+    
+    .login-notice {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        padding: 20px;
+        border-radius: 8px;
+        text-align: center;
+    }
+    
+    .login-notice h3 {
+        color: #856404;
+        margin-top: 0;
+    }
+    
+    .login-notice p {
+        color: #856404;
+        margin-bottom: 20px;
+    }
+    
+    .login-btn {
+        background: #007cba;
+        color: white;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 6px;
+        text-decoration: none;
+        display: inline-block;
+        font-weight: 600;
+    }
+    
+    .login-btn:hover {
+        background: #005a87;
+        color: white;
+        text-decoration: none;
     }
     
     .spark-mobile-form {
@@ -160,15 +271,33 @@ function spark_mobile_render_form() {
         border-color: #007cba;
     }
     
-    .form-group input[type="file"] {
-        width: 100%;
-        padding: 16px;
-        border: 2px dashed #007cba;
-        border-radius: 8px;
+    .photo-options {
+        display: flex;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+    
+    .photo-btn {
+        flex: 1;
+        padding: 16px 12px;
         background: #f8f9fa;
-        text-align: center;
+        border: 2px solid #007cba;
+        border-radius: 8px;
+        color: #007cba;
+        font-size: 14px;
+        font-weight: 600;
         cursor: pointer;
-        font-size: 16px;
+        transition: all 0.3s ease;
+    }
+    
+    .photo-btn:hover {
+        background: #007cba;
+        color: white;
+    }
+    
+    .photo-btn.active {
+        background: #007cba;
+        color: white;
     }
     
     #image_preview {
@@ -238,6 +367,16 @@ function spark_mobile_render_form() {
         .form-group select {
             font-size: 16px; /* Prevents zoom on iOS */
         }
+        
+        .user-info {
+            flex-direction: column;
+            gap: 8px;
+            text-align: center;
+        }
+        
+        .photo-options {
+            flex-direction: column;
+        }
     }
     </style>
     
@@ -245,7 +384,30 @@ function spark_mobile_render_form() {
     document.addEventListener('DOMContentLoaded', function() {
         const fileInput = document.getElementById('featured_image');
         const preview = document.getElementById('image_preview');
+        const takePhotoBtn = document.getElementById('take_photo_btn');
+        const choosePhotoBtn = document.getElementById('choose_photo_btn');
         
+        // Handle photo selection buttons
+        takePhotoBtn.addEventListener('click', function() {
+            fileInput.setAttribute('capture', 'environment');
+            fileInput.click();
+            setActiveButton(takePhotoBtn);
+        });
+        
+        choosePhotoBtn.addEventListener('click', function() {
+            fileInput.removeAttribute('capture');
+            fileInput.click();
+            setActiveButton(choosePhotoBtn);
+        });
+        
+        function setActiveButton(activeBtn) {
+            [takePhotoBtn, choosePhotoBtn].forEach(btn => {
+                btn.classList.remove('active');
+            });
+            activeBtn.classList.add('active');
+        }
+        
+        // Handle file preview
         fileInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
@@ -263,9 +425,81 @@ function spark_mobile_render_form() {
 }
 
 /**
+ * Render login notice for unauthorized users
+ */
+function spark_mobile_render_login_notice() {
+    $login_url = wp_login_url( get_permalink() );
+    ?>
+    <div class="spark-mobile-form-container">
+        <div class="login-notice">
+            <h3>Access Required</h3>
+            <p>You need to be logged in with appropriate permissions to create social posts.</p>
+            <p>Please log in to your WordPress admin account and ensure you have the "Create Social Posts" capability.</p>
+            <a href="<?php echo esc_url( $login_url ); ?>" class="login-btn">Login to WordPress</a>
+        </div>
+    </div>
+    
+    <style>
+    .spark-mobile-form-container {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 20px;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    
+    .login-notice {
+        background: #fff3cd;
+        border: 1px solid #ffeaa7;
+        padding: 30px 20px;
+        border-radius: 12px;
+        text-align: center;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    }
+    
+    .login-notice h3 {
+        color: #856404;
+        margin-top: 0;
+        margin-bottom: 16px;
+        font-size: 24px;
+    }
+    
+    .login-notice p {
+        color: #856404;
+        margin-bottom: 16px;
+        line-height: 1.5;
+    }
+    
+    .login-btn {
+        background: #007cba;
+        color: white;
+        padding: 16px 32px;
+        border: none;
+        border-radius: 8px;
+        text-decoration: none;
+        display: inline-block;
+        font-weight: 600;
+        font-size: 16px;
+        transition: background 0.3s ease;
+    }
+    
+    .login-btn:hover {
+        background: #005a87;
+        color: white;
+        text-decoration: none;
+    }
+    </style>
+    <?php
+}
+
+/**
  * Process form submission
  */
 function spark_mobile_process_submission() {
+    // Double-check permissions
+    if ( ! spark_mobile_user_can_create_posts() ) {
+        return 'Error: You do not have permission to create social posts.';
+    }
+    
     // Validate required fields
     if ( empty( $_POST['post_title'] ) || empty( $_POST['post_category'] ) || empty( $_FILES['featured_image']['name'] ) ) {
         return 'Error: Please fill in all required fields.';
@@ -293,7 +527,7 @@ function spark_mobile_process_submission() {
         'post_content' => sanitize_textarea_field( $_POST['post_content'] ),
         'post_status'  => 'publish',
         'post_type'    => 'social-post',
-        'post_author'  => get_current_user_id() ?: 1, // Use current user or admin
+        'post_author'  => get_current_user_id(), // Use current logged-in user
     );
     
     $post_id = wp_insert_post( $post_data );
@@ -341,7 +575,7 @@ add_action( 'wp_head', function() {
         document.addEventListener("DOMContentLoaded", function() {
             const container = document.querySelector(".spark-mobile-form-container");
             if (container) {
-                container.insertAdjacentHTML("afterbegin", "<div class=\"spark-message success\">Your social post has been published successfully! <a href=\"" + window.location.pathname + "\">Create another post</a></div>");
+                container.insertAdjaHTML("afterbegin", "<div class=\"spark-message success\">Your social post has been published successfully! <a href=\"" + window.location.pathname + "\">Create another post</a></div>");
             }
         });
         </script>';
@@ -357,3 +591,80 @@ function spark_mobile_add_viewport_meta() {
     }
 }
 add_action( 'wp_head', 'spark_mobile_add_viewport_meta' );
+
+/**
+ * Admin menu for managing social post permissions
+ */
+function spark_mobile_admin_menu() {
+    add_options_page(
+        'Social Posts Permissions',
+        'Social Posts',
+        'manage_options',
+        'spark-mobile-permissions',
+        'spark_mobile_permissions_page'
+    );
+}
+add_action( 'admin_menu', 'spark_mobile_admin_menu' );
+
+/**
+ * Admin page for managing permissions
+ */
+function spark_mobile_permissions_page() {
+    if ( isset( $_POST['update_permissions'] ) && wp_verify_nonce( $_POST['permissions_nonce'], 'update_permissions' ) ) {
+        $users = get_users();
+        foreach ( $users as $user ) {
+            $user_obj = new WP_User( $user->ID );
+            if ( isset( $_POST['user_permissions'][ $user->ID ] ) ) {
+                $user_obj->add_cap( 'create_social_posts' );
+            } else {
+                $user_obj->remove_cap( 'create_social_posts' );
+            }
+        }
+        echo '<div class="notice notice-success"><p>Permissions updated successfully!</p></div>';
+    }
+    
+    $users = get_users();
+    ?>
+    <div class="wrap">
+        <h1>Social Posts Permissions</h1>
+        <p>Manage which users can create social posts from the mobile form.</p>
+        
+        <form method="post">
+            <?php wp_nonce_field( 'update_permissions', 'permissions_nonce' ); ?>
+            
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Role</th>
+                        <th>Can Create Social Posts</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php foreach ( $users as $user ) : ?>
+                        <tr>
+                            <td>
+                                <strong><?php echo esc_html( $user->display_name ); ?></strong><br>
+                                <small><?php echo esc_html( $user->user_email ); ?></small>
+                            </td>
+                            <td><?php echo esc_html( implode( ', ', $user->roles ) ); ?></td>
+                            <td>
+                                <input type="checkbox" name="user_permissions[<?php echo $user->ID; ?>]" 
+                                       value="1" <?php checked( user_can( $user, 'create_social_posts' ) || user_can( $user, 'administrator' ) ); ?>
+                                       <?php disabled( user_can( $user, 'administrator' ) ); ?>>
+                                <?php if ( user_can( $user, 'administrator' ) ) : ?>
+                                    <small>(Administrator - always has access)</small>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+            
+            <p class="submit">
+                <input type="submit" name="update_permissions" class="button-primary" value="Update Permissions">
+            </p>
+        </form>
+    </div>
+    <?php
+}
