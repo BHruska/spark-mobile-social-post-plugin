@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Spark Mobile Moments
  * Description: Mobile-friendly frontend form for creating Moments with camera integration
- * Version: 1.2.0
+ * Version: 2.0.0
  * Author: Bth
  * License: GPL-2.0-or-later
  * Text Domain: spark-mobile-moments
@@ -93,18 +93,169 @@ function spark_mobile_render_form() {
     
     // Handle form submission
     $message = '';
+    $show_success_screen = false;
+    $moments_archive_url = home_url( '/?post_type=moment' );
+    
     if ( isset( $_POST['submit_moment'] ) && wp_verify_nonce( $_POST['moment_nonce'], 'submit_moment' ) ) {
-        $message = spark_mobile_process_submission();
+        $result = spark_mobile_process_submission();
+        
+        // Check if this is a special success message
+        if ( strpos( $result, 'SUCCESS_WITH_BUTTONS|' ) === 0 ) {
+            $show_success_screen = true;
+            $moments_archive_url = str_replace( 'SUCCESS_WITH_BUTTONS|', '', $result );
+            $message = 'Success: Your moment has been published!';
+        } else {
+            $show_success_screen = false;
+            $message = $result;
+        }
     }
     
-    // Get categories for dropdown
-    $categories = get_terms( array(
-        'taxonomy' => 'moment-category',
-        'hide_empty' => false,
-    ) );
-    
     $current_user = wp_get_current_user();
-    $moments_archive_url = home_url( '/?post_type=moment' );
+    
+    // If we should show success screen, render it and exit
+    if ( $show_success_screen ) {
+        ?>
+        <div class="spark-mobile-form-container">
+            <div class="user-info">
+                <p>Welcome, <strong><?php echo esc_html( $current_user->display_name ); ?></strong>! 
+                <a href="<?php echo wp_logout_url( get_permalink() ); ?>" class="logout-link">Logout</a></p>
+            </div>
+            
+            <div class="spark-message success">
+                <?php echo esc_html( $message ); ?>
+            </div>
+            
+            <div class="success-actions">
+                <button type="button" class="action-btn primary" onclick="window.location.href='<?php echo get_permalink(); ?>'">
+                    ➕ Create Another Moment
+                </button>
+                
+                <button type="button" class="action-btn secondary" 
+                        onclick="window.open('<?php echo esc_url( $moments_archive_url ); ?>', '_blank')">
+                    👁️ View All Moments
+                </button>
+            </div>
+        </div>
+        
+        <style>
+        .spark-mobile-form-container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        
+        .user-info {
+            background: #f8f9fa;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .user-info p {
+            margin: 0;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .logout-link {
+            color: #007cba;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        
+        .logout-link:hover {
+            text-decoration: underline;
+        }
+        
+        .spark-message {
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            text-align: center;
+            font-size: 18px;
+        }
+        
+        .spark-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .success-actions {
+            margin-top: 20px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .action-btn {
+            padding: 16px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .action-btn.primary {
+            background: #007cba;
+            color: white;
+        }
+        
+        .action-btn.primary:hover {
+            background: #005a87;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 124, 186, 0.3);
+        }
+        
+        .action-btn.secondary {
+            background: #28a745;
+            color: white;
+        }
+        
+        .action-btn.secondary:hover {
+            background: #218838;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+        }
+        
+        .action-btn:active {
+            transform: translateY(0);
+        }
+        
+        /* Mobile optimizations */
+        @media (max-width: 768px) {
+            .spark-mobile-form-container {
+                padding: 12px;
+            }
+            
+            .user-info {
+                flex-direction: column;
+                gap: 8px;
+                text-align: center;
+            }
+            
+            .action-btn {
+                font-size: 14px;
+                padding: 12px 20px;
+            }
+        }
+        </style>
+        
+        <?php
+        return;
+    }
+    
+    // Show regular form
     ?>
     
     <div class="spark-mobile-form-container">
@@ -120,13 +271,19 @@ function spark_mobile_render_form() {
         <?php endif; ?>
         
         <div class="action-buttons">
-            <?php if ( $moments_archive_url ) : ?>
-                <button type="button" id="view_moments_btn" class="view-moments-btn" 
-                        onclick="window.open('<?php echo esc_url( $moments_archive_url ); ?>', '_blank')">
-                    👁️ View All Moments
-                </button>
-            <?php endif; ?>
+            <button type="button" id="view_moments_btn" class="view-moments-btn" 
+                    onclick="window.open('<?php echo esc_url( $moments_archive_url ); ?>', '_blank')">
+                👁️ View All Moments
+            </button>
         </div>
+        
+        <?php
+        // Get categories for dropdown
+        $categories = get_terms( array(
+            'taxonomy' => 'moment-category',
+            'hide_empty' => false,
+        ) );
+        ?>
         
         <form method="post" enctype="multipart/form-data" class="spark-mobile-form">
             <?php wp_nonce_field( 'submit_moment', 'moment_nonce' ); ?>
@@ -134,8 +291,7 @@ function spark_mobile_render_form() {
             <div class="form-group">
                 <label for="post_title">Title</label>
                 <input type="text" id="post_title" name="post_title" required 
-                       placeholder="What's happening?" 
-                       value="<?php echo isset( $_POST['post_title'] ) ? esc_attr( $_POST['post_title'] ) : ''; ?>">
+                       placeholder="What's happening?">
             </div>
             
             <div class="form-group">
@@ -158,8 +314,7 @@ function spark_mobile_render_form() {
                 <select id="post_category" name="post_category" required>
                     <option value="">Select a category...</option>
                     <?php foreach ( $categories as $category ) : ?>
-                        <option value="<?php echo $category->term_id; ?>" 
-                                <?php selected( isset( $_POST['post_category'] ) ? $_POST['post_category'] : '', $category->term_id ); ?>>
+                        <option value="<?php echo $category->term_id; ?>">
                             <?php echo esc_html( $category->name ); ?>
                         </option>
                     <?php endforeach; ?>
@@ -169,7 +324,7 @@ function spark_mobile_render_form() {
             <div class="form-group">
                 <label for="post_content">Description</label>
                 <textarea id="post_content" name="post_content" rows="4" 
-                          placeholder="Tell us about this moment..."><?php echo isset( $_POST['post_content'] ) ? esc_textarea( $_POST['post_content'] ) : ''; ?></textarea>
+                          placeholder="Tell us about this moment..."></textarea>
             </div>
             
             <div class="form-group">
@@ -241,41 +396,6 @@ function spark_mobile_render_form() {
     
     .view-moments-btn:active {
         transform: translateY(0);
-    }
-    
-    .login-notice {
-        background: #fff3cd;
-        border: 1px solid #ffeaa7;
-        padding: 20px;
-        border-radius: 8px;
-        text-align: center;
-    }
-    
-    .login-notice h3 {
-        color: #856404;
-        margin-top: 0;
-    }
-    
-    .login-notice p {
-        color: #856404;
-        margin-bottom: 20px;
-    }
-    
-    .login-btn {
-        background: #007cba;
-        color: white;
-        padding: 12px 24px;
-        border: none;
-        border-radius: 6px;
-        text-decoration: none;
-        display: inline-block;
-        font-weight: 600;
-    }
-    
-    .login-btn:hover {
-        background: #005a87;
-        color: white;
-        text-decoration: none;
     }
     
     .spark-mobile-form {
@@ -437,6 +557,8 @@ function spark_mobile_render_form() {
         const takePhotoBtn = document.getElementById('take_photo_btn');
         const choosePhotoBtn = document.getElementById('choose_photo_btn');
         
+        if (!fileInput || !takePhotoBtn || !choosePhotoBtn) return;
+        
         // Handle photo selection buttons
         takePhotoBtn.addEventListener('click', function() {
             fileInput.setAttribute('capture', 'environment');
@@ -545,92 +667,107 @@ function spark_mobile_render_login_notice() {
  * Process form submission
  */
 function spark_mobile_process_submission() {
+    $log_file = '/home/u923682758/domains/sparkmontessori.org/public_html/new/moment-debug.log';
+    
+    // Log start
+    file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] Form submission started\n", FILE_APPEND);
+    
     // Double-check permissions
     if ( ! spark_mobile_user_can_create_moments() ) {
+        file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] Permission check failed\n", FILE_APPEND);
         return 'Error: You do not have permission to create moments.';
     }
+    file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] Permission check passed\n", FILE_APPEND);
     
     // Validate required fields
     if ( empty( $_POST['post_title'] ) || empty( $_POST['post_category'] ) || empty( $_FILES['featured_image']['name'] ) ) {
+        file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] Required fields validation failed\n", FILE_APPEND);
         return 'Error: Please fill in all required fields.';
     }
+    file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] Required fields validation passed\n", FILE_APPEND);
     
     // Validate file upload
     if ( $_FILES['featured_image']['error'] !== UPLOAD_ERR_OK ) {
+        file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] File upload error: " . $_FILES['featured_image']['error'] . "\n", FILE_APPEND);
         return 'Error: There was a problem uploading your image.';
     }
+    file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] File upload validation passed\n", FILE_APPEND);
     
     // Check file type
     $allowed_types = array( 'image/jpeg', 'image/jpg', 'image/png', 'image/gif' );
     if ( ! in_array( $_FILES['featured_image']['type'], $allowed_types ) ) {
+        file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] File type validation failed: " . $_FILES['featured_image']['type'] . "\n", FILE_APPEND);
         return 'Error: Please upload a valid image file (JPG, PNG, or GIF).';
     }
+    file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] File type validation passed\n", FILE_APPEND);
     
     // Check file size (5MB limit)
     if ( $_FILES['featured_image']['size'] > 5 * 1024 * 1024 ) {
+        file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] File size validation failed: " . $_FILES['featured_image']['size'] . " bytes\n", FILE_APPEND);
         return 'Error: Image file is too large. Please use an image under 5MB.';
     }
+    file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] File size validation passed\n", FILE_APPEND);
     
-    // Create the post
-    $post_data = array(
-        'post_title'   => sanitize_text_field( $_POST['post_title'] ),
-        'post_content' => sanitize_textarea_field( $_POST['post_content'] ),
-        'post_status'  => 'publish',
-        'post_type'    => 'moment',
-        'post_author'  => get_current_user_id(), // Use current logged-in user
-    );
-    
-    $post_id = wp_insert_post( $post_data );
-    
-    if ( is_wp_error( $post_id ) ) {
-        return 'Error: Could not create moment. Please try again.';
+    try {
+        file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] About to create post\n", FILE_APPEND);
+        
+        // Create the post
+        $post_data = array(
+            'post_title'   => sanitize_text_field( $_POST['post_title'] ),
+            'post_content' => sanitize_textarea_field( $_POST['post_content'] ),
+            'post_status'  => 'publish',
+            'post_type'    => 'moment',
+            'post_author'  => get_current_user_id(),
+        );
+        
+        $post_id = wp_insert_post( $post_data );
+        file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] wp_insert_post result: " . print_r($post_id, true) . "\n", FILE_APPEND);
+        
+        if ( is_wp_error( $post_id ) ) {
+            file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] wp_insert_post failed\n", FILE_APPEND);
+            return 'Error: Could not create moment. Please try again.';
+        }
+        
+        file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] Post created with ID: $post_id\n", FILE_APPEND);
+        
+        // Handle image upload
+        file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] About to handle media upload\n", FILE_APPEND);
+        
+        require_once( ABSPATH . 'wp-admin/includes/image.php' );
+        require_once( ABSPATH . 'wp-admin/includes/file.php' );
+        require_once( ABSPATH . 'wp-admin/includes/media.php' );
+        
+        $attachment_id = media_handle_upload( 'featured_image', $post_id );
+        file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] media_handle_upload result: " . print_r($attachment_id, true) . "\n", FILE_APPEND);
+        
+        if ( is_wp_error( $attachment_id ) ) {
+            file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] Media upload failed\n", FILE_APPEND);
+            wp_delete_post( $post_id, true );
+            return 'Error: Could not upload image. Please try again.';
+        }
+        
+        file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] Media uploaded with ID: $attachment_id\n", FILE_APPEND);
+        
+        // Set as featured image
+        set_post_thumbnail( $post_id, $attachment_id );
+        file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] Featured image set\n", FILE_APPEND);
+        
+        // Set category
+        $category_id = intval( $_POST['post_category'] );
+        wp_set_post_terms( $post_id, array( $category_id ), 'moment-category' );
+        file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] Category set\n", FILE_APPEND);
+        
+        file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] About to return success\n", FILE_APPEND);
+        
+        // Return success message without redirect
+        $moments_url = home_url( '/?post_type=moment' );
+        return 'SUCCESS_WITH_BUTTONS|' . $moments_url;
+        
+    } catch (Exception $e) {
+        file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] Exception caught: " . $e->getMessage() . "\n", FILE_APPEND);
+        return 'Error: ' . $e->getMessage();
     }
-    
-    // Handle image upload
-    require_once( ABSPATH . 'wp-admin/includes/image.php' );
-    require_once( ABSPATH . 'wp-admin/includes/file.php' );
-    require_once( ABSPATH . 'wp-admin/includes/media.php' );
-    
-    $attachment_id = media_handle_upload( 'featured_image', $post_id );
-    
-    if ( is_wp_error( $attachment_id ) ) {
-        wp_delete_post( $post_id, true );
-        return 'Error: Could not upload image. Please try again.';
-    }
-    
-    // Set as featured image
-    set_post_thumbnail( $post_id, $attachment_id );
-    
-    // Set category
-    $category_id = intval( $_POST['post_category'] );
-    wp_set_post_terms( $post_id, array( $category_id ), 'moment-category' );
-    
-    // Clear form by redirecting
-    $redirect_url = add_query_arg( 'posted', '1', get_permalink() );
-    wp_redirect( $redirect_url );
-    exit;
 }
-
-/**
- * Show success message after redirect
- */
-function spark_mobile_show_success_message() {
-    if ( isset( $_GET['posted'] ) && $_GET['posted'] == '1' ) {
-        echo '<div class="spark-message success">Your moment has been published successfully!</div>';
-    }
-}
-add_action( 'wp_head', function() {
-    if ( is_page( 'mobile-moment' ) && isset( $_GET['posted'] ) ) {
-        echo '<script>
-        document.addEventListener("DOMContentLoaded", function() {
-            const container = document.querySelector(".spark-mobile-form-container");
-            if (container) {
-                container.insertAdjacentHTML("afterbegin", "<div class=\"spark-message success\">Your moment has been published successfully! <a href=\"" + window.location.pathname + "\">Create another moment</a></div>");
-            }
-        });
-        </script>';
-    }
-});
 
 /**
  * Add viewport meta tag for mobile optimization
@@ -719,8 +856,8 @@ function spark_mobile_permissions_page() {
         <div class="card">
             <h3>Quick Links</h3>
             <p><strong>Mobile Form URL:</strong> <a href="<?php echo get_permalink( get_page_by_path( 'mobile-moment' ) ); ?>" target="_blank"><?php echo get_permalink( get_page_by_path( 'mobile-moment' ) ); ?></a></p>
-            <p><strong>Moments Archive:</strong> <a href="<?php echo get_post_type_archive_link( 'moment' ); ?>" target="_blank"><?php echo get_post_type_archive_link( 'moment' ); ?></a></p>
+            <p><strong>Moments Archive:</strong> <a href="<?php echo home_url( '/?post_type=moment' ); ?>" target="_blank"><?php echo home_url( '/?post_type=moment' ); ?></a></p>
         </div>
     </div>
     <?php
-}   
+}
