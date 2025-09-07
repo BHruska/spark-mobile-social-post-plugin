@@ -51,7 +51,8 @@ $ExcludePatterns = @(
     "__pycache__",
     "*.pyc",
     ".pytest_cache",
-    "*.zip"
+    "*.zip",
+    "*.ps1"
 )
 
 Write-Host "Creating plugin zip..." -ForegroundColor Green

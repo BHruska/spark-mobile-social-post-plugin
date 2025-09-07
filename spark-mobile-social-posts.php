@@ -1,11 +1,11 @@
 <?php
 /**
- * Plugin Name: Spark Mobile Social Posts
- * Description: Mobile-friendly frontend form for creating Social Posts with camera integration
- * Version: 1.1.0
+ * Plugin Name: Spark Mobile Moments
+ * Description: Mobile-friendly frontend form for creating Moments with camera integration
+ * Version: 1.2.0
  * Author: Bth
  * License: GPL-2.0-or-later
- * Text Domain: spark-mobile-posts
+ * Text Domain: spark-mobile-moments
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
@@ -13,22 +13,22 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 define( 'SPARK_MOBILE_PLUGIN_FILE', __FILE__ );
 define( 'SPARK_MOBILE_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SPARK_MOBILE_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-define( 'SPARK_MOBILE_PLUGIN_VER', '1.1.0' );
+define( 'SPARK_MOBILE_PLUGIN_VER', '1.2.0' );
 
 /**
  * Create the mobile submission page
  */
 function spark_mobile_create_submission_page() {
     // Check if page already exists
-    $page = get_page_by_path( 'mobile-social-post' );
+    $page = get_page_by_path( 'mobile-moment' );
     
     if ( ! $page ) {
         $page_data = array(
-            'post_title'   => 'Create Social Post',
-            'post_content' => '[spark_mobile_social_form]',
+            'post_title'   => 'Create Moment',
+            'post_content' => '[spark_mobile_moment_form]',
             'post_status'  => 'publish',
             'post_type'    => 'page',
-            'post_name'    => 'mobile-social-post'
+            'post_name'    => 'mobile-moment'
         );
         
         wp_insert_post( $page_data );
@@ -37,67 +37,74 @@ function spark_mobile_create_submission_page() {
 register_activation_hook( __FILE__, 'spark_mobile_create_submission_page' );
 
 /**
- * Add custom capability for social posts
+ * Add custom capability for moments
  */
 function spark_mobile_add_capabilities() {
     // Add capability to administrator role
     $admin_role = get_role( 'administrator' );
     if ( $admin_role ) {
-        $admin_role->add_cap( 'create_social_posts' );
+        $admin_role->add_cap( 'create_moments' );
     }
     
     // Add capability to editor role
     $editor_role = get_role( 'editor' );
     if ( $editor_role ) {
-        $editor_role->add_cap( 'create_social_posts' );
+        $editor_role->add_cap( 'create_moments' );
+    }
+    
+    // Add capability to social_media_authority role
+    $social_role = get_role( 'social_media_authority' );
+    if ( $social_role ) {
+        $social_role->add_cap( 'create_moments' );
     }
 }
 register_activation_hook( __FILE__, 'spark_mobile_add_capabilities' );
 
 /**
- * Check if user has permission to create social posts
+ * Check if user has permission to create moments
  */
-function spark_mobile_user_can_create_posts() {
+function spark_mobile_user_can_create_moments() {
     if ( ! is_user_logged_in() ) {
         return false;
     }
     
-    return current_user_can( 'create_social_posts' ) || current_user_can( 'administrator' );
+    return current_user_can( 'create_moments' ) || current_user_can( 'administrator' );
 }
 
 /**
  * Add shortcode for the mobile form
  */
-function spark_mobile_social_form_shortcode() {
+function spark_mobile_moment_form_shortcode() {
     ob_start();
     spark_mobile_render_form();
     return ob_get_clean();
 }
-add_shortcode( 'spark_mobile_social_form', 'spark_mobile_social_form_shortcode' );
+add_shortcode( 'spark_mobile_moment_form', 'spark_mobile_moment_form_shortcode' );
 
 /**
  * Render the mobile-optimized form
  */
 function spark_mobile_render_form() {
     // Check if user is logged in and has permission
-    if ( ! spark_mobile_user_can_create_posts() ) {
+    if ( ! spark_mobile_user_can_create_moments() ) {
         spark_mobile_render_login_notice();
         return;
     }
     
     // Handle form submission
     $message = '';
-    if ( isset( $_POST['submit_social_post'] ) && wp_verify_nonce( $_POST['social_post_nonce'], 'submit_social_post' ) ) {
+    if ( isset( $_POST['submit_moment'] ) && wp_verify_nonce( $_POST['moment_nonce'], 'submit_moment' ) ) {
         $message = spark_mobile_process_submission();
     }
     
     // Get categories for dropdown
     $categories = get_terms( array(
-        'taxonomy' => 'social-post-category',
+        'taxonomy' => 'moment-category',
         'hide_empty' => false,
     ) );
     
     $current_user = wp_get_current_user();
+    $moments_archive_url = home_url( '/?post_type=moment' );
     ?>
     
     <div class="spark-mobile-form-container">
@@ -112,8 +119,17 @@ function spark_mobile_render_form() {
             </div>
         <?php endif; ?>
         
+        <div class="action-buttons">
+            <?php if ( $moments_archive_url ) : ?>
+                <button type="button" id="view_moments_btn" class="view-moments-btn" 
+                        onclick="window.open('<?php echo esc_url( $moments_archive_url ); ?>', '_blank')">
+                    👁️ View All Moments
+                </button>
+            <?php endif; ?>
+        </div>
+        
         <form method="post" enctype="multipart/form-data" class="spark-mobile-form">
-            <?php wp_nonce_field( 'submit_social_post', 'social_post_nonce' ); ?>
+            <?php wp_nonce_field( 'submit_moment', 'moment_nonce' ); ?>
             
             <div class="form-group">
                 <label for="post_title">Title</label>
@@ -157,8 +173,8 @@ function spark_mobile_render_form() {
             </div>
             
             <div class="form-group">
-                <button type="submit" name="submit_social_post" class="submit-btn">
-                    Share Post
+                <button type="submit" name="submit_moment" class="submit-btn">
+                    Share Moment
                 </button>
             </div>
         </form>
@@ -196,6 +212,35 @@ function spark_mobile_render_form() {
     
     .logout-link:hover {
         text-decoration: underline;
+    }
+    
+    .action-buttons {
+        margin-bottom: 20px;
+        text-align: center;
+    }
+    
+    .view-moments-btn {
+        background: #28a745;
+        color: white;
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+    
+    .view-moments-btn:hover {
+        background: #218838;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 8px rgba(40, 167, 69, 0.3);
+    }
+    
+    .view-moments-btn:active {
+        transform: translateY(0);
     }
     
     .login-notice {
@@ -377,6 +422,11 @@ function spark_mobile_render_form() {
         .photo-options {
             flex-direction: column;
         }
+        
+        .view-moments-btn {
+            font-size: 14px;
+            padding: 10px 20px;
+        }
     }
     </style>
     
@@ -433,8 +483,8 @@ function spark_mobile_render_login_notice() {
     <div class="spark-mobile-form-container">
         <div class="login-notice">
             <h3>Access Required</h3>
-            <p>You need to be logged in with appropriate permissions to create social posts.</p>
-            <p>Please log in to your WordPress admin account and ensure you have the "Create Social Posts" capability.</p>
+            <p>You need to be logged in with appropriate permissions to create moments.</p>
+            <p>Please log in to your WordPress admin account and ensure you have the "Create Moments" capability.</p>
             <a href="<?php echo esc_url( $login_url ); ?>" class="login-btn">Login to WordPress</a>
         </div>
     </div>
@@ -496,8 +546,8 @@ function spark_mobile_render_login_notice() {
  */
 function spark_mobile_process_submission() {
     // Double-check permissions
-    if ( ! spark_mobile_user_can_create_posts() ) {
-        return 'Error: You do not have permission to create social posts.';
+    if ( ! spark_mobile_user_can_create_moments() ) {
+        return 'Error: You do not have permission to create moments.';
     }
     
     // Validate required fields
@@ -526,14 +576,14 @@ function spark_mobile_process_submission() {
         'post_title'   => sanitize_text_field( $_POST['post_title'] ),
         'post_content' => sanitize_textarea_field( $_POST['post_content'] ),
         'post_status'  => 'publish',
-        'post_type'    => 'social-post',
+        'post_type'    => 'moment',
         'post_author'  => get_current_user_id(), // Use current logged-in user
     );
     
     $post_id = wp_insert_post( $post_data );
     
     if ( is_wp_error( $post_id ) ) {
-        return 'Error: Could not create post. Please try again.';
+        return 'Error: Could not create moment. Please try again.';
     }
     
     // Handle image upload
@@ -553,7 +603,7 @@ function spark_mobile_process_submission() {
     
     // Set category
     $category_id = intval( $_POST['post_category'] );
-    wp_set_post_terms( $post_id, array( $category_id ), 'social-post-category' );
+    wp_set_post_terms( $post_id, array( $category_id ), 'moment-category' );
     
     // Clear form by redirecting
     $redirect_url = add_query_arg( 'posted', '1', get_permalink() );
@@ -566,16 +616,16 @@ function spark_mobile_process_submission() {
  */
 function spark_mobile_show_success_message() {
     if ( isset( $_GET['posted'] ) && $_GET['posted'] == '1' ) {
-        echo '<div class="spark-message success">Your social post has been published successfully!</div>';
+        echo '<div class="spark-message success">Your moment has been published successfully!</div>';
     }
 }
 add_action( 'wp_head', function() {
-    if ( is_page( 'mobile-social-post' ) && isset( $_GET['posted'] ) ) {
+    if ( is_page( 'mobile-moment' ) && isset( $_GET['posted'] ) ) {
         echo '<script>
         document.addEventListener("DOMContentLoaded", function() {
             const container = document.querySelector(".spark-mobile-form-container");
             if (container) {
-                container.insertAdjaHTML("afterbegin", "<div class=\"spark-message success\">Your social post has been published successfully! <a href=\"" + window.location.pathname + "\">Create another post</a></div>");
+                container.insertAdjacentHTML("afterbegin", "<div class=\"spark-message success\">Your moment has been published successfully! <a href=\"" + window.location.pathname + "\">Create another moment</a></div>");
             }
         });
         </script>';
@@ -586,19 +636,19 @@ add_action( 'wp_head', function() {
  * Add viewport meta tag for mobile optimization
  */
 function spark_mobile_add_viewport_meta() {
-    if ( is_page( 'mobile-social-post' ) ) {
+    if ( is_page( 'mobile-moment' ) ) {
         echo '<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">';
     }
 }
 add_action( 'wp_head', 'spark_mobile_add_viewport_meta' );
 
 /**
- * Admin menu for managing social post permissions
+ * Admin menu for managing moment permissions
  */
 function spark_mobile_admin_menu() {
     add_options_page(
-        'Social Posts Permissions',
-        'Social Posts',
+        'Moments Permissions',
+        'Moments',
         'manage_options',
         'spark-mobile-permissions',
         'spark_mobile_permissions_page'
@@ -615,9 +665,9 @@ function spark_mobile_permissions_page() {
         foreach ( $users as $user ) {
             $user_obj = new WP_User( $user->ID );
             if ( isset( $_POST['user_permissions'][ $user->ID ] ) ) {
-                $user_obj->add_cap( 'create_social_posts' );
+                $user_obj->add_cap( 'create_moments' );
             } else {
-                $user_obj->remove_cap( 'create_social_posts' );
+                $user_obj->remove_cap( 'create_moments' );
             }
         }
         echo '<div class="notice notice-success"><p>Permissions updated successfully!</p></div>';
@@ -626,8 +676,8 @@ function spark_mobile_permissions_page() {
     $users = get_users();
     ?>
     <div class="wrap">
-        <h1>Social Posts Permissions</h1>
-        <p>Manage which users can create social posts from the mobile form.</p>
+        <h1>Moments Permissions</h1>
+        <p>Manage which users can create moments from the mobile form.</p>
         
         <form method="post">
             <?php wp_nonce_field( 'update_permissions', 'permissions_nonce' ); ?>
@@ -637,7 +687,7 @@ function spark_mobile_permissions_page() {
                     <tr>
                         <th>User</th>
                         <th>Role</th>
-                        <th>Can Create Social Posts</th>
+                        <th>Can Create Moments</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -650,7 +700,7 @@ function spark_mobile_permissions_page() {
                             <td><?php echo esc_html( implode( ', ', $user->roles ) ); ?></td>
                             <td>
                                 <input type="checkbox" name="user_permissions[<?php echo $user->ID; ?>]" 
-                                       value="1" <?php checked( user_can( $user, 'create_social_posts' ) || user_can( $user, 'administrator' ) ); ?>
+                                       value="1" <?php checked( user_can( $user, 'create_moments' ) || user_can( $user, 'administrator' ) ); ?>
                                        <?php disabled( user_can( $user, 'administrator' ) ); ?>>
                                 <?php if ( user_can( $user, 'administrator' ) ) : ?>
                                     <small>(Administrator - always has access)</small>
@@ -665,6 +715,12 @@ function spark_mobile_permissions_page() {
                 <input type="submit" name="update_permissions" class="button-primary" value="Update Permissions">
             </p>
         </form>
+        
+        <div class="card">
+            <h3>Quick Links</h3>
+            <p><strong>Mobile Form URL:</strong> <a href="<?php echo get_permalink( get_page_by_path( 'mobile-moment' ) ); ?>" target="_blank"><?php echo get_permalink( get_page_by_path( 'mobile-moment' ) ); ?></a></p>
+            <p><strong>Moments Archive:</strong> <a href="<?php echo get_post_type_archive_link( 'moment' ); ?>" target="_blank"><?php echo get_post_type_archive_link( 'moment' ); ?></a></p>
+        </div>
     </div>
     <?php
 }
