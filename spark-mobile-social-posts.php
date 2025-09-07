@@ -723,4 +723,4 @@ function spark_mobile_permissions_page() {
         </div>
     </div>
     <?php
-}
+}   
