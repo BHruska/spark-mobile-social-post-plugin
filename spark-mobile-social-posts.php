@@ -579,20 +579,72 @@ function spark_mobile_render_form() {
             activeBtn.classList.add('active');
         }
         
-        // Handle file preview
+        // Compress and preview image
         fileInput.addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    preview.innerHTML = '<img src="' + e.target.result + '" alt="Preview">';
-                };
-                reader.readAsDataURL(file);
+                compressImage(file, function(compressedFile) {
+                    // Show preview
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        const originalSize = (file.size / 1024 / 1024).toFixed(2);
+                        const compressedSize = (compressedFile.size / 1024 / 1024).toFixed(2);
+                        preview.innerHTML = '<img src="' + e.target.result + '" alt="Preview">' +
+                                        '<div style="font-size:12px;color:#666;margin-top:5px;">Original: ' + originalSize + 'MB → Compressed: ' + compressedSize + 'MB</div>';
+                    };
+                    reader.readAsDataURL(compressedFile);
+                    
+                    // Replace the file input with compressed version
+                    replaceFileInput(compressedFile);
+                });
             }
         });
+        
+        function compressImage(file, callback) {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            img.onload = function() {
+                // Calculate new dimensions (max 1200px width)
+                let { width, height } = img;
+                const maxWidth = 1200;
+                
+                if (width > maxWidth) {
+                    height = (height * maxWidth) / width;
+                    width = maxWidth;
+                }
+                
+                // Set canvas size
+                canvas.width = width;
+                canvas.height = height;
+                
+                // Draw and compress
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                // Convert to blob with quality adjustment
+                canvas.toBlob(function(blob) {
+                    // Create new file object
+                    const compressedFile = new File([blob], file.name, {
+                        type: 'image/jpeg',
+                        lastModified: Date.now()
+                    });
+                    callback(compressedFile);
+                }, 'image/jpeg', 0.8); // 80% quality
+            };
+            
+            img.src = URL.createObjectURL(file);
+        }
+        
+        function replaceFileInput(newFile) {
+            // Create a new DataTransfer object to replace the file
+            const dt = new DataTransfer();
+            dt.items.add(newFile);
+            fileInput.files = dt.files;
+        }
     });
     </script>
-    
+        
     <?php
 }
 
@@ -861,3 +913,4 @@ function spark_mobile_permissions_page() {
     </div>
     <?php
 }
+
